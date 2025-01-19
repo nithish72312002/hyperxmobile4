@@ -1,109 +1,152 @@
-import { StyleSheet, Image, Platform } from 'react-native';
+import React, { useEffect, useState } from "react";
+import { StyleSheet, View, Text, FlatList, ActivityIndicator } from "react-native";
+import { createInfoPageWebSocket } from "@/api/info";
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-
-export default function TabTwoScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
-  );
+interface PerpTokenData {
+  name: string;
+  price: number;
+  volume: number;
+  change: number; // 24-hour change percentage
 }
 
+const InfoPage: React.FC = () => {
+  const [tokens, setTokens] = useState<PerpTokenData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cleanupWebSocket = createInfoPageWebSocket(
+      (data) => {
+        try {
+          if (!data || !data.meta || !data.assetCtxs) {
+            console.error("Unexpected WebSocket data format:", data);
+            return;
+          }
+
+          const { meta, assetCtxs } = data;
+
+          // Map `meta.universe` (perps only) with `assetCtxs` (price and volume data)
+          const formattedTokens = meta.universe.map((token: any, index: number) => {
+            const ctx = assetCtxs[index] || {};
+            const { markPx, dayBaseVlm, prevDayPx } = ctx;
+
+            const price = markPx !== undefined ? parseFloat(markPx) : 0;
+            const volume = dayBaseVlm !== undefined ? parseFloat(dayBaseVlm) : 0;
+            const prevPrice = prevDayPx !== undefined ? parseFloat(prevDayPx) : 0;
+
+            // Calculate 24-hour percentage change
+            const change = prevPrice > 0 ? ((price - prevPrice) / prevPrice) * 100 : 0;
+
+            return {
+              name: token.name || "Unknown",
+              price,
+              volume,
+              change,
+            };
+          });
+
+          setTokens(formattedTokens);
+          setIsLoading(false);
+        } catch (err) {
+          console.error("Error processing WebSocket data:", err);
+          setError("Error processing WebSocket data.");
+        }
+      },
+      (err) => {
+        setError(err);
+        setIsLoading(false);
+      }
+    );
+
+    // Cleanup WebSocket connection on component unmount
+    return cleanupWebSocket;
+  }, []);
+
+  const renderToken = ({ item }: { item: PerpTokenData }) => (
+    <View style={styles.tokenRow}>
+      <Text style={styles.tokenName}>{item.name}</Text>
+      <Text style={styles.tokenDetails}>
+        Price: {item.price.toFixed(2)} | Volume: {item.volume.toFixed(2)}
+      </Text>
+      <Text
+        style={[
+          styles.tokenChange,
+          item.change >= 0 ? styles.positiveChange : styles.negativeChange,
+        ]}
+      >
+        24h Change: {item.change.toFixed(2)}%
+      </Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Loading perpetual markets...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Perpetual Token Information</Text>
+      <FlatList
+        data={tokens}
+        keyExtractor={(item) => item.name}
+        renderItem={renderToken}
+      />
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: "#fff",
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  tokenRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  tokenName: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  tokenDetails: {
+    fontSize: 14,
+    color: "#555",
+  },
+  tokenChange: {
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  positiveChange: {
+    color: "green",
+  },
+  negativeChange: {
+    color: "red",
+  },
+  errorText: {
+    color: "red",
+    textAlign: "center",
   },
 });
+
+export default InfoPage;
