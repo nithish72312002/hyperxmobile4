@@ -10,7 +10,11 @@ ios/build/
 # Local configuration file (sdk path, etc)
 local.properties
 
-# Log/OS Files
+
+
+
+
+
 *.log
 *.lock
 
@@ -25,6 +29,7 @@ output.json
 *.iml
 .idea/
 misc.xml
+
 deploymentTargetDropDown.xml
 render.experimental.xml
 

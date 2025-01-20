@@ -1,46 +1,52 @@
 import React, { useEffect } from "react";
-import { View, StyleSheet, FlatList } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import OrderBookMarket from "@/components/OrderBookMarket";
-import CandleChartWithRangeSwitcher from "@/components/lightweightchart";
-import DummyTradingViewChart from "@/components/lightweightchart";
+
+import SpotAssetOverview from "@/components/SpotAssetOverview";
+import PerpAssetOverview from "@/components/PerpAssetOverview";
 
 const DetailsPage: React.FC = () => {
-  const { symbol } = useLocalSearchParams();
+  const { symbol } = useLocalSearchParams(); // Get the symbol parameter
   const navigation = useNavigation();
 
   useEffect(() => {
     if (symbol) {
       navigation.setOptions({
-        title: `${symbol.toUpperCase()} Details`,
+        title: `${symbol.toUpperCase()}`,
       });
     }
   }, [symbol, navigation]);
 
-  const renderContent = () => (
-    <View>
-      <View style={styles.chartContainer}>
-        <DummyTradingViewChart />
-      </View>
-      <View style={styles.orderBookContainer}>
-        <OrderBookMarket symbol={symbol || "ETH"} />
-      </View>
-    </View>
-  );
+  const isSpot = symbol?.includes("@") || symbol?.includes("/"); // Check if symbol is a spot asset
 
   return (
-    <FlatList
-      data={[{ key: "content" }]} // Fake data to render one item (your content)
-      renderItem={renderContent}
-      keyExtractor={(item) => item.key}
-    />
+    <View style={styles.container}>
+      {/* Chart Container */}
+      <View style={styles.chartContainer}>
+        {isSpot ? (
+          <SpotAssetOverview symbol={symbol || ""} />
+        ) : (
+          <PerpAssetOverview symbol={symbol || ""} />
+        )}
+      </View>
+
+      {/* OrderBook */}
+      <View style={styles.orderBookContainer}>
+        <OrderBookMarket symbol={symbol || ""} />
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
   chartContainer: {
-    height: 400, // Adjust height
+    height: 400, // Adjust as needed
     marginBottom: 16,
   },
   orderBookContainer: {

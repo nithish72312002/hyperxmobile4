@@ -75,8 +75,8 @@ const SpotInfoPage: React.FC = () => {
     };
   }, []);
 
-  const renderToken = ({ item }: { item: SpotTokenData }) => (
-    <TouchableOpacity onPress={() => handleNavigateToDetails(item.id)}>
+  const RenderToken = React.memo(({ item, onPress }: { item: SpotTokenData; onPress: (id: string) => void }) => (
+    <TouchableOpacity onPress={() => onPress(item.id)}>
       <View style={styles.tokenRow}>
         <View style={styles.tokenColumn}>
           <Text style={styles.tokenName}>{item.name}</Text>
@@ -97,6 +97,10 @@ const SpotInfoPage: React.FC = () => {
         </View>
       </View>
     </TouchableOpacity>
+  ));
+
+  const renderToken = ({ item }: { item: SpotTokenData }) => (
+    <RenderToken item={item} onPress={handleNavigateToDetails} />
   );
 
   if (isLoading) {
@@ -113,12 +117,18 @@ const SpotInfoPage: React.FC = () => {
       <View style={styles.headerRow}>
         <Text style={[styles.headerText, styles.nameColumn]}>Name / Vol</Text>
         <Text style={[styles.headerText, styles.priceColumn]}>Last Price</Text>
-        <Text style={[styles.headerText, styles.changeColumn]}>24h Change</Text>
+        <Text style={[styles.headerText, styles.changeColumn]}>24h Chg%</Text>
       </View>
       <FlatList
         data={tokens}
         keyExtractor={(item) => item.id}
         renderItem={renderToken}
+        initialNumToRender={10} // Renders the first 10 items initially
+        getItemLayout={(data, index) => ({
+          length: 60, // Estimated row height
+          offset: 60 * index,
+          index,
+        })}
       />
     </View>
   );

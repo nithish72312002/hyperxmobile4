@@ -29,23 +29,23 @@ const PerpPage: React.FC = () => {
 
   useEffect(() => {
     const wsManager = WebSocketManager.getInstance();
-  
+
     const listener = (data: any) => {
       try {
         const { meta, assetCtxs } = data;
-  
+
         // Process tokens and exclude those with volume = 0
         const formattedTokens = meta.universe
           .map((token: any, index: number) => {
             const ctx = assetCtxs[index] || {};
             const { markPx, dayBaseVlm, prevDayPx } = ctx;
-  
+
             const price = markPx !== undefined ? parseFloat(markPx) : 0;
             const volume = dayBaseVlm !== undefined ? parseFloat(dayBaseVlm) : 0;
             const prevPrice = prevDayPx !== undefined ? parseFloat(prevDayPx) : 0;
-  
+
             const change = prevPrice > 0 ? ((price - prevPrice) / prevPrice) * 100 : 0;
-  
+
             return {
               name: token.name || "Unknown",
               price,
@@ -54,44 +54,49 @@ const PerpPage: React.FC = () => {
             };
           })
           .filter((token: PerpTokenData) => token.volume > 0); // Exclude tokens with volume = 0
-  
+
         setTokens(formattedTokens);
         setIsLoading(false);
       } catch (err) {
         console.error("Error processing WebSocket data:", err);
       }
     };
-  
+
     wsManager.addListener("webData2", listener);
-  
+
     return () => {
       wsManager.removeListener("webData2", listener);
     };
   }, []);
-  
+
+  const RenderToken = React.memo(
+    ({ item, onPress }: { item: PerpTokenData; onPress: (name: string) => void }) => (
+      <TouchableOpacity onPress={() => onPress(item.name)}>
+        <View style={styles.tokenRow}>
+          <View style={styles.tokenColumn}>
+            <Text style={styles.tokenName}>{item.name}</Text>
+            <Text style={styles.tokenVolume}>{item.volume.toFixed(2)} Vol</Text>
+          </View>
+          <View style={styles.priceColumn}>
+            <Text style={styles.tokenPrice}>{item.price}</Text>
+          </View>
+          <View style={styles.changeColumn}>
+            <Text
+              style={[
+                styles.tokenChange,
+                item.change >= 0 ? styles.positiveChange : styles.negativeChange,
+              ]}
+            >
+              {item.change.toFixed(2)}%
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    )
+  );
 
   const renderToken = ({ item }: { item: PerpTokenData }) => (
-    <TouchableOpacity onPress={() => handleNavigateToDetails(item.name)}>
-      <View style={styles.tokenRow}>
-        <View style={styles.tokenColumn}>
-          <Text style={styles.tokenName}>{item.name}</Text>
-          <Text style={styles.tokenVolume}>{item.volume.toFixed(2)} Vol</Text>
-        </View>
-        <View style={styles.priceColumn}>
-          <Text style={styles.tokenPrice}>{item.price}</Text>
-        </View>
-        <View style={styles.changeColumn}>
-          <Text
-            style={[
-              styles.tokenChange,
-              item.change >= 0 ? styles.positiveChange : styles.negativeChange,
-            ]}
-          >
-            {item.change.toFixed(2)}%
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <RenderToken item={item} onPress={handleNavigateToDetails} />
   );
 
   if (isLoading) {
@@ -108,12 +113,18 @@ const PerpPage: React.FC = () => {
       <View style={styles.headerRow}>
         <Text style={[styles.headerText, styles.nameColumn]}>Name / Vol</Text>
         <Text style={[styles.headerText, styles.priceColumn]}>Last Price</Text>
-        <Text style={[styles.headerText, styles.changeColumn]}>24h Change</Text>
+        <Text style={[styles.headerText, styles.changeColumn]}>24h Chg%</Text>
       </View>
       <FlatList
         data={tokens}
         keyExtractor={(item) => item.name}
         renderItem={renderToken}
+        initialNumToRender={10} // Renders the first 10 items initially
+        getItemLayout={(data, index) => ({
+          length: 60, // Estimated row height
+          offset: 60 * index,
+          index,
+        })}
       />
     </View>
   );
